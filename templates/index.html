@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧩 拼豆AI图纸生成器</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #e67e22;
+            --primary-dark: #d35400;
+            --secondary: #f39c12;
+            --bg: #fdf6e3;
+            --card-bg: #fff;
+            --text: #2c3e50;
+            --text-light: #7f8c8d;
+            --border: #e0d6c8;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        /* 顶部用户栏 */
+        .user-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border-radius: 0 0 20px 20px;
+            margin-bottom: 20px;
+        }
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .user-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+        }
+        .user-name { font-weight: 600; }
+        .user-badge {
+            font-size: 0.7rem; padding: 2px 8px;
+            background: rgba(255,255,255,0.2); border-radius: 10px;
+        }
+        .guest-badge { background: var(--warning); }
+        .login-btn {
+            padding: 8px 20px; background: white; color: var(--primary);
+            border: none; border-radius: 20px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .login-btn:hover { transform: scale(1.05); }
+        
+        /* 卡片样式 */
+        .card {
+            background: var(--card-bg); border-radius: 20px; padding: 25px;
+            box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 1.3rem; color: var(--primary); margin-bottom: 20px;
+            padding-bottom: 10px; border-bottom: 2px solid var(--border);
+            display: flex; align-items: center; gap: 10px;
+        }
+        
+        /* 模式切换 */
+        .mode-switch { display: flex; gap: 10px; margin-bottom: 20px; }
+        .mode-btn {
+            flex: 1; padding: 15px; border: 2px solid var(--border); border-radius: 12px;
+            background: #faf8f5; cursor: pointer; transition: all 0.3s; text-align: center;
+        }
+        .mode-btn:hover { border-color: var(--primary); }
+        .mode-btn.active { border-color: var(--primary); background: #fff8f0; }
+        .mode-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+        .mode-btn .icon { font-size: 2rem; margin-bottom: 8px; }
+        .mode-btn .title { font-weight: 600; }
+        .mode-btn .desc { font-size: 0.85rem; color: var(--text-light); }
+        .lock-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.7); border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 2rem;
+        }
+        
+        /* 上传区域 */
+        .upload-area {
+            border: 3px dashed var(--border); border-radius: 15px;
+            padding: 40px; text-align: center; cursor: pointer;
+            transition: all 0.3s; background: #faf8f5;
+        }
+        .upload-area:hover { border-color: var(--primary); background: #fff8f0; }
+        .upload-area input { display: none; }
+        .upload-icon { font-size: 3rem; margin-bottom: 15px; }
+        .upload-text { color: var(--text-light); }
+        .upload-hint { font-size: 0.85rem; color: #aaa; margin-top: 10px; }
+        .preview-container { margin-top: 20px; text-align: center; }
+        .preview-image {
+            max-width: 100%; max-height: 300px; border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        /* 输入框 */
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 8px; }
+        .input-group select, .text-input {
+            width: 100%; padding: 12px 15px;
+            border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;
+        }
+        .input-group select:focus, .text-input:focus { outline: none; border-color: var(--primary); }
+        .text-input { min-height: 80px; resize: vertical; }
+        
+        /* 板型选择 */
+        .board-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .board-option {
+            padding: 15px 10px; border: 2px solid var(--border); border-radius: 12px;
+            text-align: center; cursor: pointer; transition: all 0.3s;
+            background: #faf8f5; position: relative;
+        }
+        .board-option:hover:not(.restricted) { border-color: var(--primary); }
+        .board-option.active { border-color: var(--primary); background: #fff8f0; }
+        .board-option.restricted { opacity: 0.6; cursor: not-allowed; }
+        .board-option .lock-icon { position: absolute; top: 5px; right: 5px; font-size: 1rem; }
+        .board-option input { display: none; }
+        .board-name { font-weight: 600; font-size: 0.95rem; }
+        .board-info { font-size: 0.75rem; color: var(--text-light); margin-top: 4px; }
+        .board-count {
+            display: inline-block; background: var(--primary); color: white;
+            padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-top: 6px;
+        }
+        
+        /* 色系选择 */
+        .color-set-info {
+            background: linear-gradient(135deg, #fff8f0 0%, #fff 100%);
+            border: 2px solid var(--border); border-radius: 12px;
+            padding: 15px; margin-bottom: 15px;
+        }
+        .color-set-name { font-size: 1.1rem; font-weight: 600; color: var(--primary); margin-bottom: 5px; }
+        .color-set-count {
+            display: inline-block; background: var(--primary); color: white;
+            padding: 2px 10px; border-radius: 12px; font-size: 0.85rem; margin-left: 10px;
+        }
+        .color-set-desc { font-size: 0.85rem; color: var(--text-light); }
+        
+        /* 按钮 */
+        .btn {
+            padding: 14px 28px; border: none; border-radius: 12px;
+            font-size: 1.1rem; font-weight: 600; cursor: pointer;
+            transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(230,126,34,0.4); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #ecf0f1; color: var(--text); }
+        .btn-group { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 20px; }
+        
+        /* 结果区域 */
+        .loading { display: none; text-align: center; padding: 40px; }
+        .loading.show { display: block; }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 4px solid var(--border); border-top-color: var(--primary);
+            border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .preview-placeholder {
+            padding: 60px 20px; color: var(--text-light); text-align: center;
+        }
+        .result-placeholder { font-size: 4rem; margin-bottom: 15px; }
+        
+        /* 结果统计 */
+        .result-stats {
+            display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;
+        }
+        .stat-item {
+            background: #f8f4ef; padding: 12px 20px; border-radius: 12px;
+            text-align: center; flex: 1; min-width: 100px;
+        }
+        .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .stat-label { font-size: 0.85rem; color: var(--text-light); }
+        
+        /* ===== V2: 工具栏 ===== */
+        .toolbar {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px;
+            padding: 12px; background: #f8f4ef; border-radius: 12px;
+        }
+        .tool-btn {
+            padding: 8px 14px; border: 2px solid var(--border); border-radius: 8px;
+            background: white; cursor: pointer; font-size: 0.9rem;
+            transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .tool-btn:hover { border-color: var(--primary); background: #fff8f0; }
+        .tool-btn.active { border-color: var(--primary); background: #fff8f0; color: var(--primary); font-weight: 600; }
+        .tool-btn .emoji { font-size: 1.1rem; }
+        
+        /* ===== V2: 交互网格图纸 ===== */
+        .pattern-viewport {
+            position: relative; overflow: hidden;
+            border: 2px solid var(--border); border-radius: 10px;
+            background: #f0ece4; height: 450px; cursor: grab;
+            user-select: none; -webkit-user-select: none;
+        }
+        .pattern-viewport:active { cursor: grabbing; }
+        .pattern-grid-wrap {
+            transform-origin: 0 0; position: absolute; top: 0; left: 0;
+            transition: none;
+        }
+        .pattern-grid {
+            display: grid; gap: 0;
+        }
+        .bead-cell {
+            border-right: 1px solid rgba(180,180,180,0.3);
+            border-bottom: 1px solid rgba(180,180,180,0.3);
+            transition: opacity 0.15s, filter 0.15s;
+            cursor: pointer; position: relative;
+        }
+        /* 5格辅助线：加粗加深 */
+        .bead-cell.border-v { border-right: 2.5px solid rgba(80,80,80,0.45); }
+        .bead-cell.border-h { border-bottom: 2.5px solid rgba(80,80,80,0.45); }
+        .bead-cell.border-vh { border-right: 2.5px solid rgba(80,80,80,0.45); border-bottom: 2.5px solid rgba(80,80,80,0.45); }
+        .bead-cell:hover { outline: 2px solid var(--primary); outline-offset: -2px; z-index: 2; }
+        /* 高亮：微亮边+外发光，不用粗白框 */
+        .bead-cell.highlighted { z-index: 1; filter: brightness(1.15) drop-shadow(0 0 3px rgba(255,200,80,0.7)); }
+        .bead-cell.dimmed { opacity: 0.12; filter: grayscale(0.6); }
+        /* 按色号完成：半透明+斜线纹理 */
+        .bead-cell.color-done {
+            opacity: 0.28;
+            background-image: repeating-linear-gradient(
+                45deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px
+            ) !important;
+        }
+        
+        /* ===== V2: 小地图 ===== */
+        .minimap {
+            position: absolute; bottom: 10px; right: 10px;
+            border: 2px solid rgba(0,0,0,0.3); border-radius: 4px;
+            background: rgba(255,255,255,0.85); overflow: hidden;
+            z-index: 10; cursor: pointer;
+        }
+        .minimap canvas { display: block; }
+        .minimap-viewport {
+            position: absolute; border: 2px solid var(--primary);
+            background: rgba(230,126,34,0.15); pointer-events: none;
+        }
+        
+        /* ===== V2: 缩放控制 ===== */
+        .zoom-controls {
+            position: absolute; top: 10px; right: 10px; z-index: 10;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .zoom-btn {
+            width: 36px; height: 36px; border: 1px solid var(--border);
+            border-radius: 8px; background: white; cursor: pointer;
+            font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .zoom-btn:hover { background: #fff8f0; border-color: var(--primary); }
+        
+        /* ===== V2: 材料清单 ===== */
+        .tab-switch { display: flex; gap: 0; margin-bottom: 15px; }
+        .tab-btn {
+            flex: 1; padding: 10px; text-align: center; cursor: pointer;
+            border: 2px solid var(--border); background: #faf8f5;
+            font-weight: 600; transition: all 0.2s; font-size: 0.95rem;
+        }
+        .tab-btn:first-child { border-radius: 10px 0 0 10px; }
+        .tab-btn:last-child { border-radius: 0 10px 10px 0; border-left: none; }
+        .tab-btn.active { background: #fff8f0; border-color: var(--primary); color: var(--primary); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        
+        .material-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .material-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; background: #f8f4ef; border-radius: 8px;
+            border: 1px solid var(--border); min-width: 120px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .material-item:hover, .material-item.highlight { border-color: var(--primary); background: #fff8f0; }
+        .material-swatch {
+            width: 20px; height: 20px; border-radius: 4px;
+            border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;
+        }
+        .material-id { font-weight: 600; font-size: 0.85rem; color: var(--primary); }
+        .material-name { font-size: 0.75rem; color: var(--text-light); }
+        .material-count { font-weight: 700; font-size: 0.9rem; margin-left: auto; }
+        .material-total {
+            margin-top: 15px; padding: 12px; background: #fff8f0;
+            border-radius: 10px; text-align: center; font-weight: 600;
+        }
+        
+        /* 去杂色选择 */
+        .noise-options { display: flex; gap: 8px; margin-top: 8px; }
+        .noise-option {
+            flex: 1; padding: 6px 10px; border: 2px solid var(--border); border-radius: 8px;
+            text-align: center; cursor: pointer; font-size: 0.85rem; transition: all 0.2s;
+        }
+        .noise-option:hover { border-color: var(--primary); }
+        .noise-option.active { border-color: var(--primary); background: #fff8f0; color: var(--primary); font-weight: 600; }
+        
+        /* 品牌转换 */
+        .convert-select {
+            padding: 6px 12px; border: 2px solid var(--border); border-radius: 8px;
+            font-size: 0.9rem; cursor: pointer;
+        }
+        .convert-select:focus { border-color: var(--primary); outline: none; }
+        
+        /* 导出按钮 */
+        .export-options { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+        .export-btn {
+            padding: 12px 20px; background: #f8f4ef; border: 2px solid var(--border);
+            border-radius: 10px; cursor: pointer; transition: all 0.3s;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .export-btn:hover { border-color: var(--primary); background: #fff8f0; }
+        
+        /* 色号统计表格 */
+        .color-table { width: 100%; border-collapse: collapse; }
+        .color-table th, .color-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        .color-table th { background: #f8f4ef; font-weight: 600; }
+        .color-swatch {
+            width: 24px; height: 24px; border-radius: 4px;
+            border: 1px solid rgba(0,0,0,0.1); display: inline-block; vertical-align: middle;
+        }
+        .color-id { font-weight: 600; color: var(--primary); }
+        .color-row { cursor: pointer; transition: background 0.15s; }
+        .color-row:hover { background: #fff8f0; }
+        .color-row.highlight { background: #fff0e0; }
+        
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--text); color: white; padding: 15px 30px;
+            border-radius: 10px; opacity: 0; transition: all 0.3s; z-index: 1000;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.warning { background: var(--warning); }
+        
+        /* 登录弹窗 */
+        .modal-overlay {
+            display: none; position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6); z-index: 2000;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: white; border-radius: 20px; padding: 30px;
+            max-width: 400px; width: 90%; text-align: center;
+        }
+        .modal h2 { color: var(--primary); margin-bottom: 20px; }
+        .modal p { color: var(--text-light); margin-bottom: 15px; }
+        .modal-benefits {
+            background: #f8f4ef; border-radius: 12px;
+            padding: 15px; margin: 20px 0; text-align: left;
+        }
+        .modal-benefit { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+        .modal-benefit .icon { color: var(--success); }
+        .wx-login-btn {
+            width: 100%; padding: 15px; background: #07c160; color: white;
+            border: none; border-radius: 25px; font-size: 1.1rem;
+            font-weight: 600; cursor: pointer; margin: 15px 0;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .wx-login-btn:hover { background: #06ad56; }
+        .modal small { color: var(--text-light); font-size: 0.8rem; }
+        
+        /* 每日次数提示 */
+        .daily-limit-bar {
+            background: #fff8f0; border: 1px solid var(--warning);
+            border-radius: 8px; padding: 10px 15px; margin-bottom: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .daily-limit-text { color: var(--warning); font-size: 0.9rem; }
+        .daily-limit-count { font-weight: 700; color: var(--primary); }
+        
+        /* 主内容布局 */
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) {
+            .main-content { grid-template-columns: 1fr; }
+            .board-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部用户栏 -->
+    <div class="user-bar">
+        <div class="user-info">
+            <div class="user-avatar" id="user-avatar">👤</div>
+            <div>
+                <div class="user-name" id="user-name">游客用户</div>
+                <span class="user-badge guest-badge" id="user-badge">游客模式</span>
+            </div>
+        </div>
+        <button class="login-btn" id="login-btn" onclick="openLoginModal()">微信登录</button>
+    </div>
+    
+    <div class="container">
+        <!-- 输入区域 -->
+        <div class="card">
+            <div class="card-title">📥 选择模式</div>
+            
+            <div class="mode-switch">
+                <div class="mode-btn active" id="mode-upload-btn" onclick="selectMode('upload')">
+                    <div class="icon">📤</div>
+                    <div class="title">图片上传</div>
+                    <div class="desc">上传已有图片</div>
+                </div>
+                <div class="mode-btn" id="mode-text-btn" onclick="selectMode('text')">
+                    <div class="icon">✨</div>
+                    <div class="title">AI生成</div>
+                    <div class="desc">输入文字创作</div>
+                    <div class="lock-overlay" id="ai-lock">🔒</div>
+                </div>
+            </div>
+            
+            <div id="upload-panel">
+                <div class="upload-area" id="upload-area">
+                    <input type="file" id="file-input" accept="image/jpeg,image/png,image/gif">
+                    <div class="upload-icon">🖼️</div>
+                    <div class="upload-text">点击或拖拽上传图片</div>
+                    <div class="upload-hint">支持 JPG、PNG、GIF 格式</div>
+                </div>
+                <div class="preview-container" id="upload-preview" style="display: none;">
+                    <img id="preview-img" class="preview-image" alt="预览">
+                    <button class="btn btn-secondary" style="margin-top: 15px;" onclick="clearImage()">✕ 清除</button>
+                </div>
+            </div>
+            
+            <div id="text-panel" style="display: none;">
+                <div class="input-group">
+                    <label>📝 描述你想要的作品</label>
+                    <textarea class="text-input" id="prompt-input" placeholder="例如：可爱的猫咪、浪漫的樱花、彩虹..."></textarea>
+                </div>
+            </div>
+            
+            <div class="daily-limit-bar" id="daily-limit-bar">
+                <span class="daily-limit-text">今日剩余生成次数</span>
+                <span class="daily-limit-count" id="daily-count">3/3</span>
+            </div>
+            
+            <div class="card-title" style="margin-top: 20px;">🎨 色系套装</div>
+            <div class="input-group">
+                <div class="color-set-info" id="color-set-display">
+                    <div class="color-set-name">221色全色板 <span class="color-set-count">221色</span></div>
+                    <div class="color-set-desc">MARD官方全部221色</div>
+                </div>
+                <select id="color-set-select" onchange="onColorSetChange()">
+                    <option value="221">221色全色板</option>
+                    <option value="144">144色高级套装</option>
+                    <option value="120">120色专业套装</option>
+                    <option value="96">96色进阶套装</option>
+                    <option value="72">72色入门套装</option>
+                </select>
+            </div>
+            
+            <div class="card-title" style="margin-top: 20px;">✨ 颜色优化</div>
+            <div class="input-group">
+                <div style="display: flex; gap: 10px; width: 100%;">
+                    <label style="flex:1; cursor:pointer; padding: 10px; border: 2px solid var(--border); border-radius: 10px; text-align: center; transition: all 0.2s;" id="enhance-none-label" onclick="setEnhanceMode('none')">
+                        <div style="font-weight:600; font-size:0.95rem;">原始色</div>
+                        <div style="font-size:0.75rem; color:var(--text-light); margin-top:4px;">忠实还原图片原色</div>
+                    </label>
+                    <label style="flex:1; cursor:pointer; padding: 10px; border: 2px solid var(--primary); border-radius: 10px; text-align: center; background: rgba(230,126,34,0.08); transition: all 0.2s;" id="enhance-vivid-label" onclick="setEnhanceMode('vivid')">
+                        <div style="font-weight:600; font-size:0.95rem; color:var(--primary);">鲜明优化 ✨</div>
+                        <div style="font-size:0.75rem; color:var(--text-light); margin-top:4px;">提饱和度+去灰，推荐</div>
+                    </label>
+                </div>
+                <input type="hidden" id="enhance-mode" value="vivid">
+            </div>
+            
+            <div class="card-title" style="margin-top: 20px;">📐 拼豆板型</div>
+            <div class="board-grid" id="board-grid">
+                <label class="board-option" id="board-52">
+                    <input type="radio" name="board" value="52">
+                    <div class="board-name">52钉板</div>
+                    <div class="board-info">小号 14×14cm</div>
+                    <div class="board-count">2,704钉</div>
+                </label>
+                <label class="board-option restricted" id="board-78">
+                    <input type="radio" name="board" value="78" disabled>
+                    <span class="lock-icon">🔒</span>
+                    <div class="board-name">78钉板</div>
+                    <div class="board-info">中号 21×21cm</div>
+                    <div class="board-count">6,084钉</div>
+                </label>
+                <label class="board-option restricted" id="board-104">
+                    <input type="radio" name="board" value="104" disabled>
+                    <span class="lock-icon">🔒</span>
+                    <div class="board-name">104钉板</div>
+                    <div class="board-info">大号 28×28cm</div>
+                    <div class="board-count">10,816钉</div>
+                </label>
+            </div>
+            
+            <div class="card-title" style="margin-top: 20px;">📏 边缘留白</div>
+            <div class="input-group">
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <label class="margin-option" id="margin-0" onclick="setMargin(0)" style="flex:1; cursor:pointer; padding: 8px; border: 2px solid var(--primary); border-radius: 8px; text-align: center; background: rgba(230,126,34,0.08);">
+                        <div style="font-weight:600; font-size:0.9rem; color:var(--primary);">0格</div>
+                        <div style="font-size:0.7rem; color:var(--text-light);">铺满</div>
+                    </label>
+                    <label class="margin-option" id="margin-1" onclick="setMargin(1)" style="flex:1; cursor:pointer; padding: 8px; border: 2px solid var(--border); border-radius: 8px; text-align: center;">
+                        <div style="font-weight:600; font-size:0.9rem;">1格</div>
+                        <div style="font-size:0.7rem; color:var(--text-light);">微留白</div>
+                    </label>
+                    <label class="margin-option" id="margin-2" onclick="setMargin(2)" style="flex:1; cursor:pointer; padding: 8px; border: 2px solid var(--border); border-radius: 8px; text-align: center;">
+                        <div style="font-weight:600; font-size:0.9rem;">2格</div>
+                        <div style="font-size:0.7rem; color:var(--text-light);">留白</div>
+                    </label>
+                    <label class="margin-option" id="margin-3" onclick="setMargin(3)" style="flex:1; cursor:pointer; padding: 8px; border: 2px solid var(--border); border-radius: 8px; text-align: center;">
+                        <div style="font-weight:600; font-size:0.9rem;">3格</div>
+                        <div style="font-size:0.7rem; color:var(--text-light);">宽松</div>
+                    </label>
+                    <label class="margin-option" id="margin-4" onclick="setMargin(4)" style="flex:1; cursor:pointer; padding: 8px; border: 2px solid var(--border); border-radius: 8px; text-align: center;">
+                        <div style="font-weight:600; font-size:0.9rem;">4格</div>
+                        <div style="font-size:0.7rem; color:var(--text-light);">很宽松</div>
+                    </label>
+                </div>
+                <input type="hidden" id="margin-value" value="0">
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn btn-primary" id="generate-btn" onclick="generatePattern()">🎨 开始生成图纸</button>
+            </div>
+        </div>
+        
+        <!-- 结果区域 -->
+        <div class="card">
+            <div class="card-title">🎯 生成的图纸</div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>正在生成图纸...</div>
+            </div>
+            
+            <div class="preview-placeholder" id="placeholder">
+                <div class="result-placeholder">🧩</div>
+                <div>上传图片后点击生成</div>
+            </div>
+            
+            <div id="result-panel" style="display: none;">
+                <div class="result-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-total">0</div>
+                        <div class="stat-label">总颗数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-colors">0</div>
+                        <div class="stat-label">颜色数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-board">52</div>
+                        <div class="stat-label">板型</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-enhance" style="font-size:0.9rem;">✨鲜明</div>
+                        <div class="stat-label">颜色优化</div>
+                    </div>
+                </div>
+                
+                <!-- V2: 工具栏 -->
+                <div class="toolbar" id="toolbar">
+                    <button class="tool-btn" onclick="flipPattern()" title="烫豆翻面时对照镜像图">
+                        <span class="emoji">🔄</span> 镜像翻转
+                    </button>
+                    <button class="tool-btn" onclick="toggleHighlightMode()" id="highlight-btn" title="点击色号/格子高亮同色">
+                        <span class="emoji">🔦</span> 单色高亮
+                    </button>
+                    <button class="tool-btn" onclick="showNoisePanel()" id="noise-btn" title="合并孤立杂色点">
+                        <span class="emoji">🧹</span> 去杂色
+                    </button>
+                    <select class="convert-select" id="convert-select" onchange="convertColorSet()" title="切换色系重新匹配">
+                        <option value="">🔄 转换色系</option>
+                        <option value="72">→ 72色入门</option>
+                        <option value="96">→ 96色进阶</option>
+                        <option value="120">→ 120色专业</option>
+                        <option value="144">→ 144色高级</option>
+                        <option value="221">→ 221色全色</option>
+                    </select>
+                    <button class="tool-btn" onclick="resetColorProgress()" title="清除所有完成标记">
+                        <span class="emoji">↩️</span> 重置进度
+                    </button>
+                </div>
+                
+                <!-- 去杂色面板（默认隐藏） -->
+                <div id="noise-panel" style="display:none; margin-bottom: 12px; padding: 12px; background: #fff8f0; border-radius: 10px; border: 1px solid var(--border);">
+                    <div style="font-weight:600; margin-bottom: 8px;">🧹 去杂色强度</div>
+                    <div class="noise-options">
+                        <div class="noise-option active" id="noise-light" onclick="setNoiseLevel('light')">
+                            轻度<br><small style="color:var(--text-light)">仅孤立点</small>
+                        </div>
+                        <div class="noise-option" id="noise-medium" onclick="setNoiseLevel('medium')">
+                            中度<br><small style="color:var(--text-light)">≤2格区域</small>
+                        </div>
+                        <div class="noise-option" id="noise-heavy" onclick="setNoiseLevel('heavy')">
+                            重度<br><small style="color:var(--text-light)">≤3格区域</small>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="margin-top: 10px; padding: 8px 20px; font-size: 0.9rem;" onclick="applyNoiseRemoval()">应用去杂色</button>
+                    <button class="btn btn-secondary" style="margin-top: 10px; padding: 8px 20px; font-size: 0.9rem;" onclick="hideNoisePanel()">取消</button>
+                </div>
+                
+                <!-- V2: 交互网格图纸 -->
+                <div class="pattern-viewport" id="pattern-viewport">
+                    <div class="pattern-grid-wrap" id="pattern-grid-wrap">
+                        <div class="pattern-grid" id="pattern-grid"></div>
+                    </div>
+                    <!-- 缩放控制 -->
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomIn()" title="放大">+</button>
+                        <button class="zoom-btn" onclick="zoomOut()" title="缩小">−</button>
+                        <button class="zoom-btn" onclick="zoomFit()" title="适应">⊡</button>
+                    </div>
+                    <!-- 小地图 -->
+                    <div class="minimap" id="minimap">
+                        <canvas id="minimap-canvas"></canvas>
+                        <div class="minimap-viewport" id="minimap-viewport"></div>
+                    </div>
+                </div>
+                
+                <!-- Tab切换：色号统计 / 材料清单 -->
+                <div class="tab-switch" style="margin-top: 20px;">
+                    <div class="tab-btn active" onclick="switchTab('stats')">🎨 色号统计</div>
+                    <div class="tab-btn" onclick="switchTab('material')">📋 材料清单</div>
+                </div>
+                
+                <!-- 色号统计 Tab -->
+                <div class="tab-panel active" id="tab-stats">
+                    <div style="max-height: 250px; overflow-y: auto;">
+                        <table class="color-table" id="color-table">
+                            <thead>
+                                <tr>
+                                    <th>色号</th>
+                                    <th>颜色</th>
+                                    <th>名称</th>
+                                    <th>数量</th>
+                                    <th>完成</th>
+                                </tr>
+                            </thead>
+                            <tbody id="color-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 材料清单 Tab -->
+                <div class="tab-panel" id="tab-material">
+                    <div class="material-list" id="material-list"></div>
+                    <div class="material-total" id="material-total"></div>
+                </div>
+                
+                <!-- 导出按钮 -->
+                <div class="export-options">
+                    <button class="export-btn" id="export-png" onclick="exportPattern('png')">📷 PNG</button>
+                    <button class="export-btn" id="export-pdf" onclick="exportPattern('pdf')">📄 PDF</button>
+                    <button class="export-btn" id="export-json" onclick="exportPattern('json')">💾 JSON</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+    
+    <!-- 登录弹窗 -->
+    <div class="modal-overlay" id="login-modal">
+        <div class="modal">
+            <h2>🔐 登录解锁更多功能</h2>
+            <div class="modal-benefits">
+                <div class="modal-benefit"><span class="icon">✅</span><span>解锁78钉板、104钉板</span></div>
+                <div class="modal-benefit"><span class="icon">✅</span><span>解锁全部色系（144/221色）</span></div>
+                <div class="modal-benefit"><span class="icon">✅</span><span>导出PNG/PDF/JSON文件</span></div>
+                <div class="modal-benefit"><span class="icon">✅</span><span>AI文字生成功能</span></div>
+                <div class="modal-benefit"><span class="icon">✅</span><span>每日50次生成额度</span></div>
+            </div>
+            <button class="wx-login-btn" onclick="doWxLogin()">
+                <span>微信</span><span>一键登录</span>
+            </button>
+            <small>登录即表示同意《用户协议》和《隐私政策》</small>
+            <p style="margin-top: 15px;">
+                <a href="#" onclick="closeLoginModal(); return false;" style="color: var(--text-light);">稍后再说，继续游客模式</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 全局状态 ====================
+        let isLoggedIn = false;
+        let userInfo = null;
+        let visitorId = localStorage.getItem('visitor_id') || generateVisitorId();
+        let token = localStorage.getItem('auth_token');
+        let currentMode = 'upload';
+        let uploadedImageData = null;
+        let currentSessionId = null;
+        let dailyLimit = 3;
+        let dailyUsed = 0;
+        let colorSetsInfo = {};
+        
+        // V2 新增状态
+        let currentPattern = null;      // { grid: 2D数组, stats: [], boardType, colorSet, ... }
+        let highlightMode = false;       // 单色高亮模式
+        let highlightColorId = null;     // 当前高亮的色号
+        let completedColors = new Set(); // 已完成色号（按颜色标记进度）
+        let currentZoom = 1;             // 当前缩放比例
+        let panX = 0, panY = 0;         // 平移偏移
+        let isPanning = false;           // 是否正在拖拽
+        let panStart = { x: 0, y: 0 };  // 拖拽起始点
+        let noiseLevel = 'light';        // 去杂色强度
+        let isFlipped = false;           // 是否已翻转
+        let cellSize = 8;               // 格子尺寸（px）
+        
+        function generateVisitorId() {
+            const id = 'v_' + Math.random().toString(36).substr(2, 12);
+            localStorage.setItem('visitor_id', id);
+            return id;
+        }
+        
+        // ==================== 初始化 ====================
+        async function init() {
+            if (token) { await checkLoginStatus(); }
+            if (!token) { await initVisitorToken(); }
+            await loadColorSets();
+            selectBoard('52');
+            trackEvent('page_enter', { source: document.referrer || 'direct' });
+        }
+        
+        async function initVisitorToken() {
+            try {
+                const res = await fetch('/api/auth/visitor-token', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ visitor_id: visitorId })
+                });
+                const data = await res.json();
+                if (data.success) { token = data.token; localStorage.setItem('auth_token', token); }
+            } catch (e) { console.error('初始化游客token失败', e); }
+        }
+        
+        async function checkLoginStatus() {
+            try {
+                const res = await fetch('/api/auth/login-status');
+                const data = await res.json();
+                if (data.logged_in) { isLoggedIn = true; userInfo = data.user; updateUserUI(); updateUIPermissions(); }
+            } catch (e) { console.error('检查登录状态失败', e); }
+        }
+        
+        async function loadColorSets() {
+            try {
+                const res = await fetch('/api/color-sets');
+                const data = await res.json();
+                if (data.success) {
+                    colorSetsInfo = data.sets;
+                    if (data.guest_restricted) {
+                        const select = document.getElementById('color-set-select');
+                        Array.from(select.options).forEach(opt => {
+                            const restricted = data.sets[opt.value]?.restricted;
+                            opt.disabled = restricted;
+                        });
+                    }
+                }
+            } catch (e) { console.error('加载色系失败', e); }
+        }
+        
+        // ==================== UI更新 ====================
+        function updateUserUI() {
+            const avatar = document.getElementById('user-avatar');
+            const name = document.getElementById('user-name');
+            const badge = document.getElementById('user-badge');
+            const loginBtn = document.getElementById('login-btn');
+            if (isLoggedIn && userInfo) {
+                name.textContent = userInfo.nickname || '微信用户';
+                badge.textContent = '已登录'; badge.className = 'user-badge';
+                loginBtn.style.display = 'none';
+            } else {
+                name.textContent = '游客用户';
+                badge.textContent = '游客模式'; badge.className = 'user-badge guest-badge';
+                loginBtn.style.display = 'block';
+            }
+        }
+        
+        function updateUIPermissions() {
+            const aiBtn = document.getElementById('mode-text-btn');
+            const aiLock = document.getElementById('ai-lock');
+            if (isLoggedIn) { aiBtn.classList.remove('disabled'); aiLock.style.display = 'none'; }
+            else { aiBtn.classList.add('disabled'); aiLock.style.display = 'flex'; }
+            
+            ['52', '78', '104'].forEach(b => {
+                const el = document.getElementById(`board-${b}`);
+                const input = el.querySelector('input');
+                const lock = el.querySelector('.lock-icon');
+                if (isLoggedIn || b === '52') { el.classList.remove('restricted'); input.disabled = false; if(lock) lock.style.display = 'none'; }
+                else { el.classList.add('restricted'); input.disabled = true; if(lock) lock.style.display = 'block'; }
+            });
+        }
+        
+        function updateDailyLimit() {
+            const bar = document.getElementById('daily-limit-bar');
+            const count = document.getElementById('daily-count');
+            if (isLoggedIn) { bar.style.display = 'none'; }
+            else {
+                bar.style.display = 'flex';
+                const remaining = Math.max(0, dailyLimit - dailyUsed);
+                count.textContent = `${remaining}/${dailyLimit}`;
+                if (remaining === 0) count.style.color = 'var(--danger)';
+            }
+        }
+        
+        // ==================== 模式/参数选择 ====================
+        function selectMode(mode) {
+            if (mode === 'text' && !isLoggedIn) { openLoginModal('ai'); return; }
+            currentMode = mode;
+            document.getElementById('mode-upload-btn').classList.toggle('active', mode === 'upload');
+            document.getElementById('mode-text-btn').classList.toggle('active', mode === 'text');
+            document.getElementById('upload-panel').style.display = mode === 'upload' ? 'block' : 'none';
+            document.getElementById('text-panel').style.display = mode === 'text' ? 'block' : 'none';
+            trackEvent('mode_select', { mode });
+        }
+        
+        function selectBoard(boardType) {
+            if (!isLoggedIn && boardType !== '52') { openLoginModal('board'); return; }
+            document.querySelectorAll('.board-option').forEach(el => el.classList.remove('active'));
+            const el = document.getElementById(`board-${boardType}`);
+            el.classList.add('active'); el.querySelector('input').checked = true;
+        }
+        
+        document.querySelectorAll('.board-option').forEach(el => {
+            el.addEventListener('click', function() {
+                const input = this.querySelector('input');
+                if (!input.disabled) selectBoard(input.value);
+            });
+        });
+        
+        function onColorSetChange() {
+            const select = document.getElementById('color-set-select');
+            const setId = select.value;
+            const info = colorSetsInfo[setId] || {};
+            document.getElementById('color-set-display').innerHTML = `
+                <div class="color-set-name">${info.name || setId + '色套装'} <span class="color-set-count">${info.color_count || setId}色</span></div>
+                <div class="color-set-desc">${info.description || ''}</div>`;
+            trackEvent('param_adjust', { param_name: 'color_set', new_value: setId });
+        }
+        
+        let currentEnhanceMode = 'vivid';
+        let currentMargin = 0;
+        
+        function setEnhanceMode(mode) {
+            currentEnhanceMode = mode;
+            document.getElementById('enhance-mode').value = mode;
+            const noneLabel = document.getElementById('enhance-none-label');
+            const vividLabel = document.getElementById('enhance-vivid-label');
+            const activeStyle = { border: '2px solid var(--primary)', background: 'rgba(230,126,34,0.08)' };
+            const inactiveStyle = { border: '2px solid var(--border)', background: 'transparent' };
+            const isVivid = mode === 'vivid';
+            Object.assign(vividLabel.style, isVivid ? activeStyle : inactiveStyle);
+            vividLabel.querySelector('div:first-child').style.color = isVivid ? 'var(--primary)' : 'var(--text)';
+            Object.assign(noneLabel.style, !isVivid ? activeStyle : inactiveStyle);
+            noneLabel.querySelector('div:first-child').style.color = !isVivid ? 'var(--primary)' : 'var(--text)';
+            trackEvent('param_adjust', { param_name: 'enhance_mode', new_value: mode });
+        }
+        
+        function setMargin(val) {
+            currentMargin = val;
+            document.getElementById('margin-value').value = val;
+            for (let i = 0; i <= 4; i++) {
+                const el = document.getElementById('margin-' + i);
+                if (i === val) {
+                    el.style.borderColor = 'var(--primary)'; el.style.background = 'rgba(230,126,34,0.08)';
+                    el.querySelector('div:first-child').style.color = 'var(--primary)';
+                } else {
+                    el.style.borderColor = 'var(--border)'; el.style.background = 'transparent';
+                    el.querySelector('div:first-child').style.color = 'var(--text)';
+                }
+            }
+            trackEvent('param_adjust', { param_name: 'margin', new_value: val });
+        }
+        
+        // ==================== 文件上传 ====================
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', e => { e.preventDefault(); });
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault();
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+        
+        function handleFile(file) {
+            if (!file.type.match(/^image\/(jpeg|png|gif|webp|heic)$/)) { showToast('请上传图片格式文件', 'error'); return; }
+            window.uploadedFile = file;
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('preview-img').src = e.target.result;
+                document.getElementById('upload-preview').style.display = 'block';
+                uploadArea.style.display = 'none';
+                trackEvent('input_complete', { mode: 'image', file_size: file.size });
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function clearImage() {
+            window.uploadedFile = null; uploadedImageData = null; fileInput.value = '';
+            document.getElementById('upload-preview').style.display = 'none';
+            uploadArea.style.display = 'block';
+        }
+        
+        // ==================== 生成图纸 ====================
+        async function generatePattern() {
+            if (!isLoggedIn && dailyUsed >= dailyLimit) { showToast('今日次数已用完，请登录获取更多', 'warning'); openLoginModal('limit'); return; }
+            
+            const boardType = document.querySelector('.board-option.active input')?.value || '52';
+            const colorSet = document.getElementById('color-set-select').value;
+            
+            if (currentMode === 'upload' && !window.uploadedFile && !uploadedImageData) { showToast('请先上传图片', 'error'); return; }
+            if (currentMode === 'text' && !document.getElementById('prompt-input').value.trim()) { showToast('请输入文字描述', 'error'); return; }
+            
+            document.getElementById('placeholder').style.display = 'none';
+            document.getElementById('result-panel').style.display = 'none';
+            document.getElementById('loading').classList.add('show');
+            
+            try {
+                let response;
+                if (currentMode === 'upload') {
+                    const formData = new FormData();
+                    if (window.uploadedFile) formData.append('image', window.uploadedFile);
+                    else if (uploadedImageData) formData.append('image_data', uploadedImageData);
+                    formData.append('board_type', boardType);
+                    formData.append('color_set', colorSet);
+                    formData.append('enhance_mode', currentEnhanceMode);
+                    formData.append('margin', currentMargin);
+                    formData.append('session_id', visitorId);
+                    response = await fetch('/api/generate-from-image', {
+                        method: 'POST', body: formData,
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } else {
+                    response = await fetch('/api/generate-from-text', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            prompt: document.getElementById('prompt-input').value,
+                            board_type: boardType, color_set: colorSet,
+                            enhance_mode: currentEnhanceMode, margin: currentMargin,
+                            session_id: visitorId
+                        })
+                    });
+                }
+                
+                const result = await response.json();
+                if (result.success) {
+                    dailyUsed++; updateDailyLimit();
+                    currentSessionId = result.session_id;
+                    isFlipped = false;
+                    completedColors = new Set();
+                    loadColorProgressFromStorage();
+                    showResult(result);
+                    showToast('生成成功！🎉', 'success');
+                    trackEvent('generate_success', { board_size: boardType, color_set: colorSet, mode: currentMode, color_count: result.color_count });
+                } else if (result.code === 'LIMITED_ACCESS') {
+                    showToast(result.error, 'warning'); openLoginModal('generate');
+                } else {
+                    showToast(result.error || '生成失败', 'error');
+                }
+            } catch (e) {
+                showToast('网络错误', 'error'); console.error(e);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+        
+        function showResult(result) {
+            document.getElementById('stat-total').textContent = result.total_beads.toLocaleString();
+            document.getElementById('stat-colors').textContent = result.color_count;
+            document.getElementById('stat-board').textContent = result.board_type;
+            const enhanceEl = document.getElementById('stat-enhance');
+            enhanceEl.textContent = result.enhance_mode === 'vivid' ? '✨鲜明' : '原始色';
+            
+            // 存储图纸数据
+            currentPattern = {
+                grid: result.color_grid,
+                stats: result.color_stats,
+                boardType: result.board_type,
+                colorSet: result.color_set,
+                colorSetName: result.color_set_name,
+                totalBeads: result.total_beads
+            };
+            
+            // 构建颜色映射
+            currentPattern.colorMap = {};
+            result.color_stats.forEach(s => { currentPattern.colorMap[s.id] = s.hex; });
+            
+            // 渲染交互网格
+            renderPatternGrid();
+            renderColorStats();
+            renderMaterialList();
+            zoomFit();
+            
+            // 重置工具状态
+            highlightMode = false; highlightColorId = null;
+            document.getElementById('highlight-btn').classList.remove('active');
+            document.getElementById('convert-select').value = '';
+            
+            document.getElementById('result-panel').style.display = 'block';
+        }
+        
+        // ==================== V2: 交互网格渲染 ====================
+        function renderPatternGrid() {
+            if (!currentPattern) return;
+            const grid = currentPattern.grid;
+            const boardHeight = grid.length;
+            const boardWidth = grid[0] ? grid[0].length : 0;
+            
+            const container = document.getElementById('pattern-grid');
+            container.innerHTML = '';
+            container.style.gridTemplateColumns = `repeat(${boardWidth}, ${cellSize}px)`;
+            container.style.gridTemplateRows = `repeat(${boardHeight}, ${cellSize}px)`;
+            
+            for (let y = 0; y < boardHeight; y++) {
+                for (let x = 0; x < boardWidth; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'bead-cell';
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    const colorId = grid[y][x];
+                    cell.dataset.colorId = colorId;
+                    cell.style.width = cellSize + 'px';
+                    cell.style.height = cellSize + 'px';
+                    cell.style.backgroundColor = currentPattern.colorMap[colorId] || '#808080';
+                    
+                    // 5格辅助线：每5格加粗边框
+                    const isV = (x + 1) % 5 === 0 && x < boardWidth - 1;
+                    const isH = (y + 1) % 5 === 0 && y < boardHeight - 1;
+                    if (isV && isH) cell.classList.add('border-vh');
+                    else if (isV) cell.classList.add('border-v');
+                    else if (isH) cell.classList.add('border-h');
+                    
+                    // 色号完成标记
+                    if (completedColors.has(colorId)) cell.classList.add('color-done');
+                    
+                    // 高亮状态
+                    if (highlightMode && highlightColorId) {
+                        if (colorId !== highlightColorId) cell.classList.add('dimmed');
+                        else cell.classList.add('highlighted');
+                    }
+                    
+                    cell.addEventListener('click', () => onCellClick(x, y));
+                    container.appendChild(cell);
+                }
+            }
+            
+            // 渲染小地图
+            renderMinimap();
+        }
+        
+        function onCellClick(x, y) {
+            // 点击格子→高亮该色号（等同点击色号统计表）
+            const colorId = currentPattern.grid[y][x];
+            if (!highlightMode) toggleHighlightMode();
+            if (highlightColorId === colorId) {
+                highlightColorId = null;  // 再次点击取消
+            } else {
+                highlightColorId = colorId;
+            }
+            applyHighlight();
+        }
+        
+        // ==================== V2: 单色高亮 ====================
+        function toggleHighlightMode() {
+            highlightMode = !highlightMode;
+            const btn = document.getElementById('highlight-btn');
+            btn.classList.toggle('active', highlightMode);
+            
+            if (!highlightMode) {
+                highlightColorId = null;
+                applyHighlight();
+            }
+        }
+        
+        function applyHighlight() {
+            const cells = document.querySelectorAll('.bead-cell');
+            cells.forEach(cell => {
+                cell.classList.remove('highlighted', 'dimmed');
+                if (highlightMode && highlightColorId) {
+                    if (cell.dataset.colorId === highlightColorId) {
+                        cell.classList.add('highlighted');
+                    } else {
+                        cell.classList.add('dimmed');
+                    }
+                }
+            });
+            
+            // 更新色号统计表高亮
+            document.querySelectorAll('.color-row').forEach(row => {
+                row.classList.toggle('highlight', highlightMode && row.dataset.colorId === highlightColorId);
+            });
+            // 更新材料清单高亮
+            document.querySelectorAll('.material-item').forEach(item => {
+                item.classList.toggle('highlight', highlightMode && item.dataset.colorId === highlightColorId);
+            });
+        }
+        
+        function highlightFromStats(colorId) {
+            if (!highlightMode) toggleHighlightMode();
+            if (highlightColorId === colorId) {
+                highlightColorId = null;
+            } else {
+                highlightColorId = colorId;
+            }
+            applyHighlight();
+        }
+        
+        // ==================== V2: 按色号标记进度 ====================
+        function toggleColorDone(colorId) {
+            if (completedColors.has(colorId)) {
+                completedColors.delete(colorId);
+            } else {
+                completedColors.add(colorId);
+            }
+            // 更新格子样式
+            document.querySelectorAll(`.bead-cell[data-color-id="${colorId}"]`).forEach(cell => {
+                cell.classList.toggle('color-done', completedColors.has(colorId));
+            });
+            // 更新统计表和材料清单的勾选状态
+            document.querySelectorAll(`.color-done-check[data-color-id="${colorId}"]`).forEach(el => {
+                el.textContent = completedColors.has(colorId) ? '✅' : '☐';
+                el.classList.toggle('done', completedColors.has(colorId));
+            });
+            saveColorProgressToStorage();
+        }
+        
+        function resetColorProgress() {
+            completedColors.clear();
+            saveColorProgressToStorage();
+            document.querySelectorAll('.bead-cell.color-done').forEach(c => c.classList.remove('color-done'));
+            document.querySelectorAll('.color-done-check').forEach(el => {
+                el.textContent = '☐'; el.classList.remove('done');
+            });
+            showToast('进度已重置', 'success');
+        }
+        
+        function saveColorProgressToStorage() {
+            if (!currentSessionId) return;
+            const data = { completedColors: Array.from(completedColors), timestamp: Date.now() };
+            localStorage.setItem(`perler_color_progress_${currentSessionId}`, JSON.stringify(data));
+        }
+        
+        function loadColorProgressFromStorage() {
+            if (!currentSessionId) return;
+            try {
+                const raw = localStorage.getItem(`perler_color_progress_${currentSessionId}`);
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    completedColors = new Set(data.completedColors || []);
+                }
+            } catch (e) { completedColors = new Set(); }
+        }
+        
+        // ==================== V2: 缩放 + 小地图 ====================
+        function zoomIn() { setZoom(currentZoom * 1.3); }
+        function zoomOut() { setZoom(currentZoom / 1.3); }
+        
+        function setZoom(z) {
+            currentZoom = Math.max(0.3, Math.min(5, z));
+            applyTransform();
+        }
+        
+        function zoomFit() {
+            if (!currentPattern) return;
+            const viewport = document.getElementById('pattern-viewport');
+            const vw = viewport.clientWidth - 20;
+            const vh = viewport.clientHeight - 20;
+            const gw = currentPattern.grid[0].length * cellSize;
+            const gh = currentPattern.grid.length * cellSize;
+            const scale = Math.min(vw / gw, vh / gh, 2);
+            currentZoom = scale;
+            panX = (vw - gw * scale) / 2;
+            panY = (vh - gh * scale) / 2;
+            applyTransform();
+        }
+        
+        function applyTransform() {
+            const wrap = document.getElementById('pattern-grid-wrap');
+            wrap.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+            updateMinimapViewport();
+        }
+        
+        // 拖拽平移
+        const viewport = document.getElementById('pattern-viewport');
+        viewport.addEventListener('mousedown', e => {
+            if (e.target.closest('.zoom-btn') || e.target.closest('.minimap')) return;
+            isPanning = true; panStart = { x: e.clientX - panX, y: e.clientY - panY };
+        });
+        document.addEventListener('mousemove', e => {
+            if (!isPanning) return;
+            panX = e.clientX - panStart.x; panY = e.clientY - panStart.y;
+            applyTransform();
+        });
+        document.addEventListener('mouseup', () => { isPanning = false; });
+        
+        // 触摸支持
+        let touchStartDist = 0, touchStartZoom = 1;
+        viewport.addEventListener('touchstart', e => {
+            if (e.touches.length === 1) {
+                isPanning = true;
+                panStart = { x: e.touches[0].clientX - panX, y: e.touches[0].clientY - panY };
+            } else if (e.touches.length === 2) {
+                isPanning = false;
+                touchStartDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                touchStartZoom = currentZoom;
+            }
+        }, { passive: true });
+        viewport.addEventListener('touchmove', e => {
+            if (e.touches.length === 1 && isPanning) {
+                panX = e.touches[0].clientX - panStart.x; panY = e.touches[0].clientY - panStart.y;
+                applyTransform();
+            } else if (e.touches.length === 2) {
+                const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                setZoom(touchStartZoom * (dist / touchStartDist));
+            }
+        }, { passive: true });
+        viewport.addEventListener('touchend', () => { isPanning = false; });
+        
+        // 鼠标滚轮缩放
+        viewport.addEventListener('wheel', e => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.85 : 1.15;
+            setZoom(currentZoom * delta);
+        }, { passive: false });
+        
+        // 小地图
+        function renderMinimap() {
+            if (!currentPattern) return;
+            const grid = currentPattern.grid;
+            const h = grid.length, w = grid[0] ? grid[0].length : 0;
+            const minimapSize = 100;
+            const scale = Math.min(minimapSize / w, minimapSize / h);
+            const cw = Math.round(w * scale), ch = Math.round(h * scale);
+            
+            const canvas = document.getElementById('minimap-canvas');
+            canvas.width = cw; canvas.height = ch;
+            canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+            
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, cw, ch);
+            
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    ctx.fillStyle = currentPattern.colorMap[grid[y][x]] || '#808080';
+                    ctx.fillRect(Math.round(x * scale), Math.round(y * scale), Math.ceil(scale), Math.ceil(scale));
+                }
+            }
+            updateMinimapViewport();
+        }
+        
+        function updateMinimapViewport() {
+            if (!currentPattern) return;
+            const grid = currentPattern.grid;
+            const h = grid.length, w = grid[0] ? grid[0].length : 0;
+            const viewport = document.getElementById('pattern-viewport');
+            const canvas = document.getElementById('minimap-canvas');
+            const vpEl = document.getElementById('minimap-viewport');
+            
+            const mmW = canvas.width, mmH = canvas.height;
+            const scaleX = mmW / (w * cellSize * currentZoom);
+            const scaleY = mmH / (h * cellSize * currentZoom);
+            
+            const vpW = viewport.clientWidth * scaleX;
+            const vpH = viewport.clientHeight * scaleY;
+            const vpX = (-panX / currentZoom) * scaleX;
+            const vpY = (-panY / currentZoom) * scaleY;
+            
+            vpEl.style.width = Math.min(vpW, mmW) + 'px';
+            vpEl.style.height = Math.min(vpH, mmH) + 'px';
+            vpEl.style.left = Math.max(0, vpX) + 'px';
+            vpEl.style.top = Math.max(0, vpY) + 'px';
+        }
+        
+        // 小地图点击跳转
+        document.getElementById('minimap-canvas').addEventListener('click', e => {
+            if (!currentPattern) return;
+            const rect = e.target.getBoundingClientRect();
+            const mx = (e.clientX - rect.left) / rect.width;
+            const my = (e.clientY - rect.top) / rect.height;
+            const grid = currentPattern.grid;
+            const gw = grid[0].length * cellSize;
+            const gh = grid.length * cellSize;
+            const viewport = document.getElementById('pattern-viewport');
+            panX = -(mx * gw * currentZoom - viewport.clientWidth / 2);
+            panY = -(my * gh * currentZoom - viewport.clientHeight / 2);
+            applyTransform();
+        });
+        
+        // ==================== V2: 镜像翻转 ====================
+        async function flipPattern() {
+            if (!currentSessionId) { showToast('请先生成图纸', 'error'); return; }
+            try {
+                const res = await fetch(`/api/flip-pattern/${currentSessionId}`, {
+                    method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    isFlipped = data.flipped;
+                    currentPattern.grid = data.color_grid;
+                    // 重建颜色映射（翻转不改变映射）
+                    renderPatternGrid();
+                    applyTransform();
+                    showToast(isFlipped ? '已镜像翻转 ✅' : '已恢复原方向 ✅', 'success');
+                } else {
+                    showToast(data.error || '翻转失败', 'error');
+                }
+            } catch (e) { showToast('网络错误', 'error'); }
+        }
+        
+        // ==================== V2: 去杂色 ====================
+        function showNoisePanel() { document.getElementById('noise-panel').style.display = 'block'; }
+        function hideNoisePanel() { document.getElementById('noise-panel').style.display = 'none'; }
+        
+        function setNoiseLevel(level) {
+            noiseLevel = level;
+            ['light', 'medium', 'heavy'].forEach(l => {
+                document.getElementById(`noise-${l}`).classList.toggle('active', l === level);
+            });
+        }
+        
+        async function applyNoiseRemoval() {
+            if (!currentSessionId) { showToast('请先生成图纸', 'error'); return; }
+            hideNoisePanel();
+            try {
+                const res = await fetch(`/api/remove-noise/${currentSessionId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: noiseLevel })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentPattern.grid = data.color_grid;
+                    currentPattern.stats = data.color_stats;
+                    currentPattern.totalBeads = data.total_beads;
+                    // 重建颜色映射
+                    currentPattern.colorMap = {};
+                    data.color_stats.forEach(s => { currentPattern.colorMap[s.id] = s.hex; });
+                    
+                    renderPatternGrid(); applyTransform();
+                    renderColorStats(); renderMaterialList();
+                    document.getElementById('stat-total').textContent = data.total_beads.toLocaleString();
+                    document.getElementById('stat-colors').textContent = data.color_count;
+                    showToast('去杂色完成 ✅', 'success');
+                } else { showToast(data.error || '去杂色失败', 'error'); }
+            } catch (e) { showToast('网络错误', 'error'); }
+        }
+        
+        // ==================== V2: 一键品牌转换 ====================
+        async function convertColorSet() {
+            const select = document.getElementById('convert-select');
+            const newSet = select.value;
+            if (!newSet) return;
+            if (!currentSessionId) { showToast('请先生成图纸', 'error'); select.value = ''; return; }
+            
+            try {
+                const res = await fetch(`/api/convert-color-set/${currentSessionId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ color_set: newSet })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentPattern.grid = data.color_grid;
+                    currentPattern.stats = data.color_stats;
+                    currentPattern.totalBeads = data.total_beads;
+                    currentPattern.colorSet = data.color_set;
+                    currentPattern.colorSetName = data.color_set_name;
+                    currentPattern.colorMap = {};
+                    data.color_stats.forEach(s => { currentPattern.colorMap[s.id] = s.hex; });
+                    
+                    renderPatternGrid(); applyTransform();
+                    renderColorStats(); renderMaterialList();
+                    document.getElementById('stat-total').textContent = data.total_beads.toLocaleString();
+                    document.getElementById('stat-colors').textContent = data.color_count;
+                    showToast(`已转换为${data.color_set_name} ✅`, 'success');
+                } else { showToast(data.error || '转换失败', 'error'); }
+            } catch (e) { showToast('网络错误', 'error'); }
+            select.value = '';
+        }
+        
+        // ==================== V2: 材料清单 ====================
+        function renderMaterialList() {
+            if (!currentPattern) return;
+            const list = document.getElementById('material-list');
+            list.innerHTML = '';
+            
+            // 按系列分组
+            const series = {};
+            currentPattern.stats.forEach(s => {
+                const prefix = s.id.charAt(0);
+                const seriesNames = { A: '🟡 黄橙系', B: '🟢 绿色系', C: '🔵 蓝青系', D: '🟣 紫蓝系', E: '🩷 粉红系', F: '🔴 红橙系', G: '🟤 棕肤系', H: '⚫ 灰黑白', M: '🌫️ 莫兰迪' };
+                const name = seriesNames[prefix] || '🌈 其他';
+                if (!series[name]) series[name] = [];
+                series[name].push(s);
+            });
+            
+            Object.entries(series).forEach(([seriesName, colors]) => {
+                const group = document.createElement('div');
+                group.style.cssText = 'width:100%; margin-bottom: 8px;';
+                group.innerHTML = `<div style="font-weight:600; font-size:0.85rem; margin-bottom:6px; color:var(--text-light);">${seriesName}</div>`;
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px;';
+                
+                colors.forEach(s => {
+                    const item = document.createElement('div');
+                    item.className = 'material-item';
+                    item.dataset.colorId = s.id;
+                    if (highlightMode && highlightColorId === s.id) item.classList.add('highlight');
+                    const isDone = completedColors.has(s.id);
+                    item.innerHTML = `
+                        <span style="cursor:pointer; font-size:1.1rem; user-select:none; margin-right:6px;" onclick="event.stopPropagation(); toggleColorDone('${s.id}')">${isDone ? '✅' : '☐'}</span>
+                        <span class="material-swatch" style="background:${s.hex}"></span>
+                        <span class="material-id">${s.id}</span>
+                        <span class="material-name">${s.name}</span>
+                        <span class="material-count">${s.count}</span>
+                    `;
+                    item.addEventListener('click', () => highlightFromStats(s.id));
+                    row.appendChild(item);
+                });
+                group.appendChild(row);
+                list.appendChild(group);
+            });
+            
+            document.getElementById('material-total').innerHTML =
+                `合计：${currentPattern.totalBeads.toLocaleString()} 颗 · ${currentPattern.stats.length} 种颜色 · ${currentPattern.colorSetName}`;
+        }
+        
+        // ==================== 色号统计表 ====================
+        function renderColorStats() {
+            if (!currentPattern) return;
+            const tbody = document.getElementById('color-tbody');
+            tbody.innerHTML = '';
+            
+            currentPattern.stats.forEach(stat => {
+                const row = document.createElement('tr');
+                row.className = 'color-row';
+                row.dataset.colorId = stat.id;
+                if (highlightMode && highlightColorId === stat.id) row.classList.add('highlight');
+                const isDone = completedColors.has(stat.id);
+                row.innerHTML = `
+                    <td class="color-id">${stat.id}</td>
+                    <td><span class="color-swatch" style="background:${stat.hex}"></span></td>
+                    <td>${stat.name}</td>
+                    <td>${stat.count}</td>
+                    <td style="cursor:pointer; font-size:1.1rem; user-select:none;" class="color-done-check ${isDone ? 'done' : ''}" data-color-id="${stat.id}" onclick="event.stopPropagation(); toggleColorDone('${stat.id}')">${isDone ? '✅' : '☐'}</td>
+                `;
+                row.addEventListener('click', () => highlightFromStats(stat.id));
+                tbody.appendChild(row);
+            });
+        }
+        
+        // ==================== Tab切换 ====================
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', (tab === 'stats' && i === 0) || (tab === 'material' && i === 1));
+            });
+            document.getElementById('tab-stats').classList.toggle('active', tab === 'stats');
+            document.getElementById('tab-material').classList.toggle('active', tab === 'material');
+        }
+        
+        // ==================== 导出 ====================
+        async function exportPattern(format) {
+            if (!currentSessionId) { showToast('请先生成图纸', 'error'); return; }
+            try {
+                const response = await fetch(`/api/export/${currentSessionId}/${format}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('导出失败');
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `perler_pattern.${format}`; a.click();
+                URL.revokeObjectURL(url);
+                showToast('导出成功！', 'success');
+                trackEvent('export_success', { format });
+            } catch (e) { showToast('导出失败', 'error'); }
+        }
+        
+        // ==================== 登录 ====================
+        function openLoginModal(context) {
+            document.getElementById('login-modal').classList.add('show');
+            trackEvent('login_prompt', { context: context || 'manual' });
+        }
+        function closeLoginModal() { document.getElementById('login-modal').classList.remove('show'); }
+        
+        async function doWxLogin() {
+            try {
+                const mockCode = 'mock_' + Date.now();
+                const response = await fetch('/api/auth/wx-login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: mockCode, visitor_id: visitorId })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    token = data.token; localStorage.setItem('auth_token', token);
+                    isLoggedIn = true; userInfo = data.user;
+                    updateUserUI(); updateUIPermissions(); closeLoginModal();
+                    showToast('登录成功！', 'success');
+                    trackEvent('login_success', { method: 'wechat' });
+                } else { showToast(data.error || '登录失败', 'error'); }
+            } catch (e) { showToast('登录失败', 'error'); }
+        }
+        
+        // ==================== 埋点 ====================
+        function trackEvent(eventName, properties = {}) {
+            const data = { event: eventName, session_id: visitorId, properties: { ...properties, is_logged_in: isLoggedIn } };
+            if (navigator.sendBeacon) { navigator.sendBeacon('/api/track', JSON.stringify(data)); }
+            else { fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).catch(() => {}); }
+        }
+        
+        // ==================== Toast ====================
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message; toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+        
+        // ==================== 页面卸载 ====================
+        window.addEventListener('beforeunload', () => { trackEvent('page_leave', { last_action: 'close' }); });
+        
+        // 初始化
+        init();
+    </script>
+</body>
+</html>
