@@ -983,4 +983,5 @@ if __name__ == '__main__':
     print("👤 用户分层: 游客限制 / 登录用户全功能")
     print("=" * 50)
     
-    app.run(host='0.0.0.0', port=5000, debug=config.FLASK_DEBUG)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=config.FLASK_DEBUG)
