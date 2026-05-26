@@ -30,6 +30,13 @@ app.config['UPLOAD_FOLDER'] = '/tmp/perler_uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 
+# 全局错误处理——Render调试用，上线后可删
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    return f"<pre>{traceback.format_exc()}</pre>", 500
+
+
 def compress_image(image_data, max_size_kb=2048, max_dimension=1200):
     """
     自动压缩大图
